@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from flask_caching import Cache
 import json
 import requests
+from random import randint
 
 # Load environment variables
 load_dotenv()
@@ -1384,8 +1385,7 @@ def get_single_event(event_id):
         
         # Check if current user is the creator (for edit permissions)
         event_data['isCreator'] = event_data.get('creator_id') == current_user_id
-        
-        # Add creator information
+          # Add creator information
         creator_id = event_data.get('creator_id')
         if creator_id:
             creator_doc = db.collection('users').document(creator_id).get()
@@ -1404,4 +1404,7 @@ def get_single_event(event_id):
         return jsonify({'error': 'Failed to fetch event'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Generate a random port between 5000 and 9999 for hosting
+    random_port = randint(5000, 9999)
+    print(f"🚀 Starting EMS server on port {random_port}")
+    app.run(debug=True, host='0.0.0.0', port=random_port)
