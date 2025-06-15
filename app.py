@@ -15,10 +15,19 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key')
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_HTTPONLY'] = True
+
+# Production-optimized session configuration
+if os.getenv('RENDER'):  # Check if running on Render
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+else:
+    # Development settings
+    app.config['SESSION_COOKIE_SECURE'] = False
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Set session to expire in 7 days
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Add cache-busting headers
 @app.after_request
@@ -33,11 +42,21 @@ def add_cache_control_headers(response):
             response.set_cookie('session', '', expires=0, path='/')
     return response
 
-# Configure Flask-Caching
-cache = Cache(app, config={
+# Configure Flask-Caching with production optimizations
+cache_config = {
     'CACHE_TYPE': 'simple',
     'CACHE_DEFAULT_TIMEOUT': 300  # 5 minutes cache timeout
-})
+}
+
+# Use Redis for production if available
+if os.getenv('REDIS_URL'):
+    cache_config = {
+        'CACHE_TYPE': 'redis',
+        'CACHE_REDIS_URL': os.getenv('REDIS_URL'),
+        'CACHE_DEFAULT_TIMEOUT': 300
+    }
+
+cache = Cache(app, config=cache_config)
 
 # Function to create Firebase credentials from environment variables
 def get_firebase_credentials_from_env():
@@ -1403,8 +1422,28 @@ def get_single_event(event_id):
         print(f'Error fetching event {event_id}: {str(e)}')
         return jsonify({'error': 'Failed to fetch event'}), 500
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Render"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.utcnow().isoformat(),
+        'service': 'EMS Flask App'
+    }), 200
+
 if __name__ == '__main__':
-    # Generate a random port between 5000 and 9999 for hosting
-    random_port = randint(5000, 9999)
-    print(f"🚀 Starting EMS server on port {random_port}")
-    app.run(debug=True, host='0.0.0.0', port=random_port)
+    # Use Render's PORT environment variable (required for Render deployment)
+    port = int(os.getenv('PORT', 5000))  # Default to 5000 for local development
+    print(f"🚀 Starting EMS server on port {port}")
+    
+    # Check if running on Render (production) or locally
+    is_production = os.getenv('RENDER') == 'true'
+    
+    if is_production:
+        # Production mode - disable debug, use gunicorn recommended settings
+        print("Running in PRODUCTION mode")
+        app.run(debug=False, host='0.0.0.0', port=port)
+    else:
+        # Development mode
+        print("Running in DEVELOPMENT mode")
+        app.run(debug=True, host='0.0.0.0', port=port)

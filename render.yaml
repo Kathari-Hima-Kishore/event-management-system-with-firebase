@@ -3,14 +3,13 @@ services:
     name: ems-app
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 --max-requests 1000 --max-requests-jitter 100 app:app
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.6
       - key: RENDER
         value: true
-      - key: FLASK_ENV
-        value: production
     plan: free
     healthCheckPath: /
+    autoDeploy: true
     autoDeploy: true
