@@ -131,15 +131,3 @@ The application will be available at `http://127.0.0.1:5000`.
 3.  **Approve the Admin**: Log in with your Developer account, go to the Dev Dashboard, and approve the pending Admin account.
 4.  **Create Events**: Log in with the now-approved Admin account. From the Admin Dashboard, create new events.
 5.  **Enroll in Events**: Register a standard "User" account or visit `/public-events` to view and enroll in the events created by the Admin.
-
-## Deployment
-
-This project is configured for one-click deployment on **Render**.
-
-1.  Fork this repository to your own GitHub account.
-2.  On the [Render Dashboard](https://dashboard.render.com/), create a new "Web Service".
-3.  Connect your forked GitHub repository.
-4.  Render will automatically detect the `render.yaml` file and configure the service settings.
-5.  Go to the **Environment** tab for your new service and add all the environment variables from your local `.env` file.
-    - **Important**: When pasting the `FIREBASE_PRIVATE_KEY`, ensure it is treated as a single line with `\n` characters preserved, as the application code is set up to handle this format.
-6.  Click **Create Web Service**. Render will build and deploy your application.
