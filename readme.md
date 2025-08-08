@@ -132,5 +132,5 @@ The application will be available at `http://127.0.0.1:5000`.
 4.  **Create Events**: Log in with the now-approved Admin account. From the Admin Dashboard, create new events.
 5.  **Enroll in Events**: Register a standard "User" account or visit `/public-events` to view and enroll in the events created by the Admin.
 
-##Note:
+## Note
 Replace your own Firebase API and other required keys in environment file
