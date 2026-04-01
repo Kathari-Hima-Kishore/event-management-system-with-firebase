@@ -81,7 +81,15 @@ def get_firebase_credentials_from_env():
             print(f"Successfully parsed JSON, keys found: {list(creds.keys())}")
             # Fix newlines in private_key after JSON parsing
             if 'private_key' in creds and creds['private_key']:
-                creds['private_key'] = creds['private_key'].replace('\\n', '\n').replace('\r', '')
+                original_pk = creds['private_key']
+                print(f"Private key raw first 50 chars: {repr(original_pk[:50])}")
+                print(f"Private key contains '\\n' (literal): {repr('\\n') in original_pk}")
+                print(f"Private key contains actual newline: {'\n' in original_pk}")
+                
+                # Try multiple approaches to fix newlines
+                creds['private_key'] = original_pk.replace('\\n', '\n').replace('\r', '')
+                
+                print(f"Private key after replace first 50 chars: {repr(creds['private_key'][:50])}")
                 print(f"Private key length after processing: {len(creds['private_key'])}")
             print("Using Firebase credentials from FIREBASE_SERVICE_ACCOUNT JSON")
             return creds
