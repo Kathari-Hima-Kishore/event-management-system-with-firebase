@@ -80,25 +80,37 @@ def get_firebase_credentials_from_env():
             if 'private_key' in creds and creds['private_key']:
                 pk = creds['private_key']
                 print(f"[DEBUG] Private key length: {len(pk)}")
-                print(f"[DEBUG] Private key starts with: {repr(pk[:50])}")
-                print(f"[DEBUG] Private key ends with: {repr(pk[-50:])}")
                 
-                # json.loads already converts \\n to actual newlines
-                # Just validate the key looks correct
-                if len(pk) < 1500:
+                # Validate key length - must be > 2000 chars for valid RSA key
+                if len(pk) < 2000:
                     print(f"[DEBUG] WARNING: Private key too short ({len(pk)} chars). Key may be truncated!")
-                    print(f"[DEBUG] Solution: Regenerate service account key from Firebase Console,")
-                    print(f"[DEBUG] minify it: cat file.json | python -c 'import json,sys; print(json.dumps(json.load(sys.stdin)))'")
-                    print(f"[DEBUG] then paste the single-line output into Vercel env var.")
-            
-            print("[DEBUG] Using Firebase credentials from FIREBASE_SERVICE_ACCOUNT JSON")
-            return creds
-        except json.JSONDecodeError as e:
-            print(f"[DEBUG] Error parsing FIREBASE_SERVICE_ACCOUNT JSON: {e}")
-            import traceback
-            traceback.print_exc()
+                    print(f"[DEBUG] Skipping env var, will try local file...")
+                else:
+                    print("[DEBUG] Using Firebase credentials from FIREBASE_SERVICE_ACCOUNT JSON")
+                    return creds
+            else:
+                print("[DEBUG] No private_key found in env var JSON")
+        except Exception as e:
+            print(f"[DEBUG] Error with FIREBASE_SERVICE_ACCOUNT: {e}")
     else:
         print("[DEBUG] FIREBASE_SERVICE_ACCOUNT is empty or not set")
+    
+    # Try to load from local service account file (for local development)
+    local_cred_files = [
+        'ems-khk-firebase-adminsdk-fbsvc-debfcbcad9.json',
+        'ems-khk-firebase-adminsdk-fbsvc-5829d1e62f.json',
+        'ems-khk-firebase-adminsdk-fbsvc-6baea44613.json',
+    ]
+    for cred_file in local_cred_files:
+        if os.path.exists(cred_file):
+            print(f"[DEBUG] Found local credentials file: {cred_file}")
+            try:
+                with open(cred_file, 'r') as f:
+                    creds = json.load(f)
+                print(f"[DEBUG] Successfully loaded credentials from {cred_file}")
+                return creds
+            except Exception as e:
+                print(f"[DEBUG] Error loading {cred_file}: {e}")
     
     # Fallback to individual environment variables
     print("[DEBUG] Using Firebase credentials from individual environment variables")
