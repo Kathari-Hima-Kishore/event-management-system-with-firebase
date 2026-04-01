@@ -17,7 +17,11 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key')
 
 # Production-optimized session configuration
-if os.getenv('RENDER'):  # Check if running on Render
+if os.getenv('VERCEL'):  # Check if running on Vercel
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+elif os.getenv('RENDER'):  # Check if running on Render (legacy)
     app.config['SESSION_COOKIE_SECURE'] = True
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
@@ -1436,8 +1440,8 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))  # Default to 5000 for local development
     print(f"🚀 Starting EMS server on port {port}")
     
-    # Check if running on Render (production) or locally
-    is_production = os.getenv('RENDER') == 'true'
+    # Check if running on production (Vercel, Render) or locally
+    is_production = os.getenv('VERCEL') is not None or os.getenv('RENDER') == 'true'
     
     if is_production:
         # Production mode - disable debug, use gunicorn recommended settings
