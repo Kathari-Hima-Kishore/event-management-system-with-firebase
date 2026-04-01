@@ -65,10 +65,8 @@ cache = Cache(app, config=cache_config)
 # Function to create Firebase credentials from environment variables
 def get_firebase_credentials_from_env():
     """Create Firebase credentials dictionary from environment variables."""
-    # First try to get the entire service account JSON as a single env var
     service_account_json = os.getenv('FIREBASE_SERVICE_ACCOUNT')
     
-    # Debug logging
     print(f"[DEBUG] FIREBASE_SERVICE_ACCOUNT env var present: {service_account_json is not None}")
     if service_account_json:
         print(f"[DEBUG] FIREBASE_SERVICE_ACCOUNT length: {len(service_account_json)}")
@@ -76,55 +74,23 @@ def get_firebase_credentials_from_env():
     
     if service_account_json:
         try:
-            # Parse the JSON string
             creds = json.loads(service_account_json)
             print(f"[DEBUG] Successfully parsed JSON, keys found: {list(creds.keys())}")
             
-            # Fix newlines in private_key after JSON parsing
             if 'private_key' in creds and creds['private_key']:
-                original_pk = creds['private_key']
-                print(f"[DEBUG] Original private key length: {len(original_pk)}")
-                print(f"[DEBUG] Private key starts with: {repr(original_pk[:50])}")
-                print(f"[DEBUG] Private key ends with: {repr(original_pk[-50:])}")
+                pk = creds['private_key']
+                print(f"[DEBUG] Private key length: {len(pk)}")
+                print(f"[DEBUG] Private key starts with: {repr(pk[:50])}")
+                print(f"[DEBUG] Private key ends with: {repr(pk[-50:])}")
                 
-                # Count various newline types
-                actual_newlines = original_pk.count('\n')
-                literal_newlines = original_pk.count('\\n')
-                print(f"[DEBUG] Actual newlines (\\n): {actual_newlines}")
-                print(f"[DEBUG] Literal \\\\\
-: {literal_newlines}")
-                
-                # Convert literal \n to actual newlines, then normalize
-                # This handles cases where JSON was escaped or unescaped
-                processed_pk = original_pk.replace('\\n', '\n')
-                
-                # Remove any carriage returns
-                processed_pk = processed_pk.replace('\r', '')
-                
-                # Ensure proper PEM format - check if it has headers
-                if not processed_pk.startswith('-----BEGIN PRIVATE KEY-----'):
-                    print(f"[DEBUG] ERROR: Private key missing BEGIN header!")
-                if not processed_pk.endswith('-----END PRIVATE KEY-----'):
-                    print(f"[DEBUG] ERROR: Private key missing END footer!")
-                
-                # Ensure exactly one newline at the end of header and footer lines
-                lines = processed_pk.split('\n')
-                lines = [line.strip() for line in lines if line.strip()]
-                processed_pk = '\n'.join(lines) + '\n'
-                
-                creds['private_key'] = processed_pk
-                
-                print(f"[DEBUG] Processed private key length: {len(processed_pk)}")
-                print(f"[DEBUG] Processed private key first 100 chars: {repr(processed_pk[:100])}")
-                print(f"[DEBUG] Processed private key last 50 chars: {repr(processed_pk[-50:])}")
-                
-                # Validate key length
-                if len(processed_pk) < 1500:
-                    print(f"[DEBUG] WARNING: Private key seems too short! Expected >1500 chars, got {len(processed_pk)}")
-                    print(f"[DEBUG] This usually means the key was truncated when copied to env var")
-            else:
-                print("[DEBUG] ERROR: private_key not found in credentials!")
-                
+                # json.loads already converts \\n to actual newlines
+                # Just validate the key looks correct
+                if len(pk) < 1500:
+                    print(f"[DEBUG] WARNING: Private key too short ({len(pk)} chars). Key may be truncated!")
+                    print(f"[DEBUG] Solution: Regenerate service account key from Firebase Console,")
+                    print(f"[DEBUG] minify it: cat file.json | python -c 'import json,sys; print(json.dumps(json.load(sys.stdin)))'")
+                    print(f"[DEBUG] then paste the single-line output into Vercel env var.")
+            
             print("[DEBUG] Using Firebase credentials from FIREBASE_SERVICE_ACCOUNT JSON")
             return creds
         except json.JSONDecodeError as e:
@@ -136,10 +102,7 @@ def get_firebase_credentials_from_env():
     
     # Fallback to individual environment variables
     print("[DEBUG] Using Firebase credentials from individual environment variables")
-    private_key = os.getenv('FIREBASE_PRIVATE_KEY')
-    if private_key:
-        # Handle both literal \n and actual newlines
-        private_key = private_key.replace('\\n', '\n').replace('\r', '')
+    private_key = os.getenv('FIREBASE_PRIVATE_KEY', '')
     
     return {
         "type": os.getenv('FIREBASE_TYPE'),
