@@ -18,8 +18,7 @@
   },
   "functions": {
     "app.py": {
-      "runtime": "python3.11",
-      "handlerType": "wsgi"
+      "runtime": "python3.11"
     }
   }
 }
