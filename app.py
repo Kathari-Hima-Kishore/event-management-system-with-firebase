@@ -67,17 +67,28 @@ def get_firebase_credentials_from_env():
     """Create Firebase credentials dictionary from environment variables."""
     # First try to get the entire service account JSON as a single env var
     service_account_json = os.getenv('FIREBASE_SERVICE_ACCOUNT')
+    
+    # Debug logging
+    print(f"FIREBASE_SERVICE_ACCOUNT env var present: {service_account_json is not None}")
+    if service_account_json:
+        print(f"FIREBASE_SERVICE_ACCOUNT length: {len(service_account_json)}")
+        print(f"FIREBASE_SERVICE_ACCOUNT first 100 chars: {service_account_json[:100]}")
+    
     if service_account_json:
         try:
             # Parse the JSON string
             creds = json.loads(service_account_json)
+            print(f"Successfully parsed JSON, keys found: {list(creds.keys())}")
             # Fix newlines in private_key after JSON parsing
             if 'private_key' in creds and creds['private_key']:
                 creds['private_key'] = creds['private_key'].replace('\\n', '\n').replace('\r', '')
+                print(f"Private key length after processing: {len(creds['private_key'])}")
             print("Using Firebase credentials from FIREBASE_SERVICE_ACCOUNT JSON")
             return creds
         except json.JSONDecodeError as e:
             print(f"Error parsing FIREBASE_SERVICE_ACCOUNT JSON: {e}")
+    else:
+        print("FIREBASE_SERVICE_ACCOUNT is empty or not set")
     
     # Fallback to individual environment variables
     print("Using Firebase credentials from individual environment variables")
