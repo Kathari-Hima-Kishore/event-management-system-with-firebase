@@ -1,3 +1,5 @@
 .env.example
 .env
 .env.vercel
+*firebase-adminsdk*.json
+service-account*.json
