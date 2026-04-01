@@ -69,37 +69,73 @@ def get_firebase_credentials_from_env():
     service_account_json = os.getenv('FIREBASE_SERVICE_ACCOUNT')
     
     # Debug logging
-    print(f"FIREBASE_SERVICE_ACCOUNT env var present: {service_account_json is not None}")
+    print(f"[DEBUG] FIREBASE_SERVICE_ACCOUNT env var present: {service_account_json is not None}")
     if service_account_json:
-        print(f"FIREBASE_SERVICE_ACCOUNT length: {len(service_account_json)}")
-        print(f"FIREBASE_SERVICE_ACCOUNT first 100 chars: {service_account_json[:100]}")
+        print(f"[DEBUG] FIREBASE_SERVICE_ACCOUNT length: {len(service_account_json)}")
+        print(f"[DEBUG] FIREBASE_SERVICE_ACCOUNT first 200 chars: {service_account_json[:200]}")
     
     if service_account_json:
         try:
             # Parse the JSON string
             creds = json.loads(service_account_json)
-            print(f"Successfully parsed JSON, keys found: {list(creds.keys())}")
+            print(f"[DEBUG] Successfully parsed JSON, keys found: {list(creds.keys())}")
+            
             # Fix newlines in private_key after JSON parsing
             if 'private_key' in creds and creds['private_key']:
                 original_pk = creds['private_key']
-                print(f"Private key raw first 50 chars: {repr(original_pk[:50])}")
-                print(f"Private key contains '\\n' (literal): {repr('\\n') in original_pk}")
-                print(f"Private key contains actual newline: {'\n' in original_pk}")
+                print(f"[DEBUG] Original private key length: {len(original_pk)}")
+                print(f"[DEBUG] Private key starts with: {repr(original_pk[:50])}")
+                print(f"[DEBUG] Private key ends with: {repr(original_pk[-50:])}")
                 
-                # Try multiple approaches to fix newlines
-                creds['private_key'] = original_pk.replace('\\n', '\n').replace('\r', '')
+                # Count various newline types
+                actual_newlines = original_pk.count('\n')
+                literal_newlines = original_pk.count('\\n')
+                print(f"[DEBUG] Actual newlines (\\n): {actual_newlines}")
+                print(f"[DEBUG] Literal \\\\\
+: {literal_newlines}")
                 
-                print(f"Private key after replace first 50 chars: {repr(creds['private_key'][:50])}")
-                print(f"Private key length after processing: {len(creds['private_key'])}")
-            print("Using Firebase credentials from FIREBASE_SERVICE_ACCOUNT JSON")
+                # Convert literal \n to actual newlines, then normalize
+                # This handles cases where JSON was escaped or unescaped
+                processed_pk = original_pk.replace('\\n', '\n')
+                
+                # Remove any carriage returns
+                processed_pk = processed_pk.replace('\r', '')
+                
+                # Ensure proper PEM format - check if it has headers
+                if not processed_pk.startswith('-----BEGIN PRIVATE KEY-----'):
+                    print(f"[DEBUG] ERROR: Private key missing BEGIN header!")
+                if not processed_pk.endswith('-----END PRIVATE KEY-----'):
+                    print(f"[DEBUG] ERROR: Private key missing END footer!")
+                
+                # Ensure exactly one newline at the end of header and footer lines
+                lines = processed_pk.split('\n')
+                lines = [line.strip() for line in lines if line.strip()]
+                processed_pk = '\n'.join(lines) + '\n'
+                
+                creds['private_key'] = processed_pk
+                
+                print(f"[DEBUG] Processed private key length: {len(processed_pk)}")
+                print(f"[DEBUG] Processed private key first 100 chars: {repr(processed_pk[:100])}")
+                print(f"[DEBUG] Processed private key last 50 chars: {repr(processed_pk[-50:])}")
+                
+                # Validate key length
+                if len(processed_pk) < 1500:
+                    print(f"[DEBUG] WARNING: Private key seems too short! Expected >1500 chars, got {len(processed_pk)}")
+                    print(f"[DEBUG] This usually means the key was truncated when copied to env var")
+            else:
+                print("[DEBUG] ERROR: private_key not found in credentials!")
+                
+            print("[DEBUG] Using Firebase credentials from FIREBASE_SERVICE_ACCOUNT JSON")
             return creds
         except json.JSONDecodeError as e:
-            print(f"Error parsing FIREBASE_SERVICE_ACCOUNT JSON: {e}")
+            print(f"[DEBUG] Error parsing FIREBASE_SERVICE_ACCOUNT JSON: {e}")
+            import traceback
+            traceback.print_exc()
     else:
-        print("FIREBASE_SERVICE_ACCOUNT is empty or not set")
+        print("[DEBUG] FIREBASE_SERVICE_ACCOUNT is empty or not set")
     
     # Fallback to individual environment variables
-    print("Using Firebase credentials from individual environment variables")
+    print("[DEBUG] Using Firebase credentials from individual environment variables")
     private_key = os.getenv('FIREBASE_PRIVATE_KEY')
     if private_key:
         # Handle both literal \n and actual newlines
@@ -120,7 +156,7 @@ def get_firebase_credentials_from_env():
     }
 
 # Initialize Firebase with environment variables
-print("Using Firebase credentials from environment variables")
+print("[DEBUG] Starting Firebase initialization")
 firebase_cred_dict = get_firebase_credentials_from_env()
 
 # Validate that all required credentials are present
@@ -130,12 +166,41 @@ missing_fields = [field for field in required_fields if not firebase_cred_dict.g
 if missing_fields:
     raise ValueError(f"Missing required Firebase credentials in environment variables: {missing_fields}")
 
-cred = credentials.Certificate(firebase_cred_dict)
-firebase_admin.initialize_app(cred, {
-    'databaseURL': os.getenv('FIREBASE_DATABASE_URL'),
-    'projectId': os.getenv('FIREBASE_PROJECT_ID'),
-    'storageBucket': os.getenv('FIREBASE_STORAGE_BUCKET')
-})
+try:
+    # Try using the dict approach first
+    print("[DEBUG] Attempting to initialize with credentials dict...")
+    cred = credentials.Certificate(firebase_cred_dict)
+    print("[DEBUG] Successfully created credentials from dict")
+except Exception as e:
+    print(f"[DEBUG] Failed to create credentials from dict: {e}")
+    print("[DEBUG] Attempting fallback: writing credentials to temp file...")
+    
+    # Fallback: Write credentials to a temp file and use that
+    import tempfile
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(firebase_cred_dict, f, indent=2)
+            temp_path = f.name
+        print(f"[DEBUG] Wrote credentials to temp file: {temp_path}")
+        cred = credentials.Certificate(temp_path)
+        print("[DEBUG] Successfully created credentials from temp file")
+    except Exception as e2:
+        print(f"[DEBUG] Fallback also failed: {e2}")
+        raise
+
+# Initialize Firebase app
+try:
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': os.getenv('FIREBASE_DATABASE_URL'),
+        'projectId': os.getenv('FIREBASE_PROJECT_ID'),
+        'storageBucket': os.getenv('FIREBASE_STORAGE_BUCKET')
+    })
+    print("[DEBUG] Firebase initialized successfully")
+except Exception as e:
+    print(f"[DEBUG] Failed to initialize Firebase: {e}")
+    import traceback
+    traceback.print_exc()
+    raise
 
 # Initialize Firestore
 db = firestore.client()
