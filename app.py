@@ -1451,3 +1451,8 @@ if __name__ == '__main__':
         # Development mode
         print("Running in DEVELOPMENT mode")
         app.run(debug=True, host='0.0.0.0', port=port)
+
+# Vercel serverless handler
+def handler(request):
+    """Vercel serverless function handler"""
+    return app(request.environ, lambda status, headers: None)
