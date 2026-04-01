@@ -44,20 +44,30 @@
 
 {% block scripts %}
 <script>
-// Show/hide developer code field based on role selection
-document.getElementById('role').addEventListener('change', function() {
-    const devCodeGroup = document.getElementById('devCodeGroup');
-    const devCodeInput = document.getElementById('devCode');
-    if (this.value === 'dev') {
-        devCodeGroup.style.display = 'block';
-        devCodeInput.required = true;
-    } else {
-        devCodeGroup.style.display = 'none';
-        devCodeInput.required = false;
-    }
-});
-
-document.getElementById('registerForm').addEventListener('submit', async function(e) {
+// Wait for main.js to load before attaching event handlers
+document.addEventListener('DOMContentLoaded', function() {
+    function initRegister() {
+        if (typeof window.showLoadingOverlay !== 'function' || typeof window.hideLoadingOverlay !== 'function') {
+            console.log('[register] Waiting for main.js to load...');
+            setTimeout(initRegister, 50);
+            return;
+        }
+        console.log('[register] main.js loaded, initializing form');
+        
+        // Show/hide developer code field based on role selection
+        document.getElementById('role').addEventListener('change', function() {
+            const devCodeGroup = document.getElementById('devCodeGroup');
+            const devCodeInput = document.getElementById('devCode');
+            if (this.value === 'dev') {
+                devCodeGroup.style.display = 'block';
+                devCodeInput.required = true;
+            } else {
+                devCodeGroup.style.display = 'none';
+                devCodeInput.required = false;
+            }
+        });
+        
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
     const email = document.getElementById('email').value;
@@ -290,7 +300,11 @@ document.getElementById('registerForm').addEventListener('submit', async functio
                 }
             });
         }
-    }
-});
+    }); // Close submit handler
+    
+} // Close initRegister function
+
+initRegister();
+}); // Close DOMContentLoaded
 </script>
 {% endblock %}
