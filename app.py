@@ -65,11 +65,32 @@ cache = Cache(app, config=cache_config)
 # Function to create Firebase credentials from environment variables
 def get_firebase_credentials_from_env():
     """Create Firebase credentials dictionary from environment variables."""
+    # First try to get the entire service account JSON as a single env var
+    service_account_json = os.getenv('FIREBASE_SERVICE_ACCOUNT')
+    if service_account_json:
+        try:
+            # Parse the JSON string
+            creds = json.loads(service_account_json)
+            # Fix newlines in private_key after JSON parsing
+            if 'private_key' in creds and creds['private_key']:
+                creds['private_key'] = creds['private_key'].replace('\\n', '\n').replace('\r', '')
+            print("Using Firebase credentials from FIREBASE_SERVICE_ACCOUNT JSON")
+            return creds
+        except json.JSONDecodeError as e:
+            print(f"Error parsing FIREBASE_SERVICE_ACCOUNT JSON: {e}")
+    
+    # Fallback to individual environment variables
+    print("Using Firebase credentials from individual environment variables")
+    private_key = os.getenv('FIREBASE_PRIVATE_KEY')
+    if private_key:
+        # Handle both literal \n and actual newlines
+        private_key = private_key.replace('\\n', '\n').replace('\r', '')
+    
     return {
         "type": os.getenv('FIREBASE_TYPE'),
         "project_id": os.getenv('FIREBASE_PROJECT_ID'),
         "private_key_id": os.getenv('FIREBASE_PRIVATE_KEY_ID'),
-        "private_key": os.getenv('FIREBASE_PRIVATE_KEY').replace('\\n', '\n') if os.getenv('FIREBASE_PRIVATE_KEY') else None,
+        "private_key": private_key,
         "client_email": os.getenv('FIREBASE_CLIENT_EMAIL'),
         "client_id": os.getenv('FIREBASE_CLIENT_ID'),
         "auth_uri": os.getenv('FIREBASE_AUTH_URI'),
