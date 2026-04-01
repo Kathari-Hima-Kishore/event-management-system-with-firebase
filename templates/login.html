@@ -23,117 +23,133 @@
 
 {% block scripts %}
 <script>
-document.getElementById('loginForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-      try {
-        showLoadingOverlay();
+// Wait for main.js to load
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if functions are available, if not wait
+    function initLogin() {
+        if (typeof showLoadingOverlay !== 'function' || typeof hideLoadingOverlay !== 'function') {
+            console.log('[login] Waiting for main.js to load...');
+            setTimeout(initLogin, 50);
+            return;
+        }
+        console.log('[login] main.js loaded, initializing login form');
+        
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                showLoadingOverlay();
 
-        // Sign in with Firebase directly - Firebase will handle user existence validation
-        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-        
-        // Get the ID token
-        const idToken = await user.getIdToken();
-        
-        // Send token to backend
-        const response = await fetch('/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}`,
-                'X-Requested-With': 'XMLHttpRequest'
+                // Sign in with Firebase directly - Firebase will handle user existence validation
+                const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                
+                // Get the ID token
+                const idToken = await user.getIdToken();
+                
+                // Send token to backend
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw { response: { data: data } };
+                }
+                
+                // Hide loading overlay first
+                hideLoadingOverlay();
+                
+                // Show success message after loading is hidden
+                setTimeout(() => {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success',
+                        text: 'Login successful!',
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        backdrop: 'rgba(0, 0, 0, 0.4)',
+                        customClass: {
+                            popup: 'swal2-popup-glass',
+                            title: 'swal2-title-glass',
+                            content: 'swal2-content-glass',
+                            confirmButton: 'swal2-confirm-button-glass'
+                        }
+                    }).then(() => {
+                        window.location.href = data.redirect;
+                    });
+                }, 300);
+                
+            } catch (error) {
+                // Handle Firebase auth errors
+                if (error.code && error.code.startsWith('auth/')) {
+                    handleFirebaseAuthError(error); // handleFirebaseAuthError already hides loading and shows popup
+                } else if (error.response && error.response.data) {
+                    // Handle backend errors (e.g., user profile not found in Firestore)
+                    hideLoadingOverlay(); // Ensure loading is hidden for backend errors
+                    setTimeout(() => {
+                        const backendError = error.response.data.error;
+                        let errorMessage = 'An error occurred during login. Please try again.'; // Default message
+
+                        // Check for specific backend error messages
+                        if (backendError === 'User profile not found. Please try logging in again or contact support.') {
+                            errorMessage = backendError; // Use the specific backend message
+                        } else if (backendError === 'Admin account pending approval'){
+                            // Handled by redirect in backend, but good to have fallback
+                            errorMessage = 'Your admin account is pending approval.';
+                        } else if (backendError === 'Account has been banned') {
+                            errorMessage = 'Your account has been banned.';
+                        } else {
+                            // Fallback for any other backend error not explicitly handled
+                            errorMessage = backendError;
+                        }
+
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: errorMessage,
+                            background: 'rgba(255, 255, 255, 0.9)',
+                            backdrop: 'rgba(0, 0, 0, 0.4)',
+                            customClass: {
+                                popup: 'swal2-popup-glass',
+                                title: 'swal2-title-glass',
+                                content: 'swal2-content-glass',
+                                confirmButton: 'swal2-confirm-button-glass'
+                            }
+                        });
+                    }, 300);
+                } else {
+                    // Handle unexpected errors
+                    hideLoadingOverlay(); // Ensure loading is hidden for unexpected errors
+                    setTimeout(() => {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'An unexpected error occurred during login. Please try again.',
+                            background: 'rgba(255, 255, 255, 0.9)',
+                            backdrop: 'rgba(0, 0, 0, 0.4)',
+                            customClass: {
+                                popup: 'swal2-popup-glass',
+                                title: 'swal2-title-glass',
+                                content: 'swal2-content-glass',
+                                confirmButton: 'swal2-confirm-button-glass'
+                            }
+                        });
+                    }, 300);
+                }
             }
         });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw { response: { data: data } };
-        }
-        
-        // Hide loading overlay first
-        hideLoadingOverlay();
-        
-        // Show success message after loading is hidden
-        setTimeout(() => {
-            Swal.fire({
-                icon: 'success',
-                title: 'Success',
-                text: 'Login successful!',
-                background: 'rgba(255, 255, 255, 0.9)',
-                backdrop: 'rgba(0, 0, 0, 0.4)',
-                customClass: {
-                    popup: 'swal2-popup-glass',
-                    title: 'swal2-title-glass',
-                    content: 'swal2-content-glass',
-                    confirmButton: 'swal2-confirm-button-glass'
-                }
-            }).then(() => {
-                window.location.href = data.redirect;
-            });
-        }, 300);
-        
-    } catch (error) {
-        // Handle Firebase auth errors
-        if (error.code && error.code.startsWith('auth/')) {
-            handleFirebaseAuthError(error); // handleFirebaseAuthError already hides loading and shows popup
-        } else if (error.response && error.response.data) {
-            // Handle backend errors (e.g., user profile not found in Firestore)
-            hideLoadingOverlay(); // Ensure loading is hidden for backend errors
-            setTimeout(() => {
-                const backendError = error.response.data.error;
-                let errorMessage = 'An error occurred during login. Please try again.'; // Default message
-
-                // Check for specific backend error messages
-                if (backendError === 'User profile not found. Please try logging in again or contact support.') {
-                    errorMessage = backendError; // Use the specific backend message
-                } else if (backendError === 'Admin account pending approval'){
-                    // Handled by redirect in backend, but good to have fallback
-                    errorMessage = 'Your admin account is pending approval.';
-                } else if (backendError === 'Account has been banned') {
-                    errorMessage = 'Your account has been banned.';
-                } else {
-                    // Fallback for any other backend error not explicitly handled
-                    errorMessage = backendError;
-                }
-
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: errorMessage,
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    backdrop: 'rgba(0, 0, 0, 0.4)',
-                    customClass: {
-                        popup: 'swal2-popup-glass',
-                        title: 'swal2-title-glass',
-                        content: 'swal2-content-glass',
-                        confirmButton: 'swal2-confirm-button-glass'
-                    }
-                });
-            }, 300);
-        } else {
-            // Handle unexpected errors
-            hideLoadingOverlay(); // Ensure loading is hidden for unexpected errors
-            setTimeout(() => {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'An unexpected error occurred during login. Please try again.',
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    backdrop: 'rgba(0, 0, 0, 0.4)',
-                    customClass: {
-                        popup: 'swal2-popup-glass',
-                        title: 'swal2-title-glass',
-                        content: 'swal2-content-glass',
-                        confirmButton: 'swal2-confirm-button-glass'
-                    }
-                });
-            }, 300);
-        }
     }
+    
+    initLogin();
 });
 </script>
 {% endblock %}
